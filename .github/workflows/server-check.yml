@@ -12,42 +12,54 @@ permissions:
 jobs:
   server-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Check server and authorize deployment key
+      - name: Prepare runtime and inspect site configuration
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          MYAKA_SUDO_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
+          envs: MYAKA_SUDO_PASSWORD
           timeout: 30s
-          command_timeout: 2m
+          command_timeout: 5m
           script: |
             set -eu
-            uname -s
-            id
-            cat /etc/os-release 2>/dev/null || true
-            for tool in bun pm2 node nginx sudo unzip curl certbot; do
-              printf '%s: ' "$tool"
-              command -v "$tool" || true
-            done
-            if sudo -n true 2>/dev/null; then
-              printf 'sudo_without_password=yes\n'
+            as_root() {
+              if [ "$(id -u)" -eq 0 ]; then
+                "$@"
+              else
+                printf '%s\n' "$MYAKA_SUDO_PASSWORD" | sudo -S -p '' -- "$@"
+              fi
+            }
+            as_root true
+            as_root install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /var/www/myaka
+            MYAKA_BUN_ROOT="$HOME/.local/share/myaka/bun"
+            export PATH="$MYAKA_BUN_ROOT/bin:$HOME/.bun/bin:$PATH"
+            if [ ! -x "$MYAKA_BUN_ROOT/bin/bun" ]; then
+              mkdir -p "$HOME/.cache/myaka"
+              curl -fsSL --connect-timeout 15 --max-time 120 https://bun.com/install -o "$HOME/.cache/myaka/install-bun.sh"
+              BUN_INSTALL="$MYAKA_BUN_ROOT" bash "$HOME/.cache/myaka/install-bun.sh" bun-v1.4.2
+            fi
+            bun --version
+            node --version
+            pm2 --version
+            printf 'myaka_nginx_config_files:\n'
+            as_root grep -RIl --include='*' 'myaka\.rumiscola\.ru' /etc/nginx/sites-enabled /etc/nginx/conf.d || true
+            printf 'myaka_existing_cert:\n'
+            if as_root test -f /etc/letsencrypt/live/myaka.rumiscola.ru/fullchain.pem; then
+              as_root openssl x509 -in /etc/letsencrypt/live/myaka.rumiscola.ru/fullchain.pem -noout -dates -issuer -subject
             else
-              printf 'sudo_without_password=no\n'
+              printf 'absent\n'
             fi
-            printf 'domain_ipv4:\n'
-            getent ahostsv4 myaka.rumiscola.ru 2>/dev/null || true
-            printf 'server_addresses:\n'
-            hostname -I 2>/dev/null || true
-            umask 077
-            mkdir -p "$HOME/.ssh"
-            touch "$HOME/.ssh/authorized_keys"
-            DEPLOY_PUBLIC_KEY='restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHeC0P/Tw0BQGupag/wfwUGlUwoidakZaZITvQqw0cVG myaka-deploy'
-            if ! grep -Fqx "$DEPLOY_PUBLIC_KEY" "$HOME/.ssh/authorized_keys"; then
-              printf '%s\n' "$DEPLOY_PUBLIC_KEY" >> "$HOME/.ssh/authorized_keys"
-            fi
-            chmod 700 "$HOME/.ssh"
-            chmod 600 "$HOME/.ssh/authorized_keys"
-            printf 'myaka_deploy_key=authorized\n'
+            printf 'ssh_host_fingerprints:\n'
+            for key in /etc/ssh/ssh_host_*_key.pub; do
+              ssh-keygen -E sha256 -lf "$key"
+            done
+            printf 'myaka_pm2_process:\n'
+            pm2 describe myaka 2>/dev/null || true
+            printf 'myaka_port_state:\n'
+            ss -ltn '( sport = :2027 )' 2>/dev/null || true
