@@ -184,7 +184,7 @@ export default function Home() {
         <div className="footer-bottom">
           <div className="footer-credits">
             <p>Художник и создатель: Сора.</p>
-            <p>Разработка сайта и основной владелец персонажа: <a href="https://RumIsCola.ru" target="_blank" rel="noopener noreferrer">Студия Велром RumIsCola.ru</a></p>
+            <p>Разработка сайта и основной владелец персонажа: <a href="https://RumIsCola.ru" target="_blank" rel="noopener noreferrer">Студия Велром</a></p>
           </div>
           <span>Мяка © 2026</span>
         </div>
