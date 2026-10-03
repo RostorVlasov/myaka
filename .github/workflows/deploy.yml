@@ -93,6 +93,8 @@ jobs:
       - name: Deploy on server with PM2
         if: steps.server.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          MYAKA_SUDO_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -100,12 +102,28 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
-          command_timeout: 5m
-          envs: APP_DIR,APP_PORT,RELEASE_ID
+          command_timeout: 10m
+          envs: APP_DIR,APP_PORT,RELEASE_ID,MYAKA_SUDO_PASSWORD
           script: |
             set -eu
-            export PATH="$HOME/.bun/bin:$PATH"
+            export PATH="$HOME/.local/share/myaka/bun/bin:$HOME/.bun/bin:$PATH"
             BUNDLE_DIR="$APP_DIR/incoming/$RELEASE_ID"
             unzip -q -o "$BUNDLE_DIR/deploy.zip" -d "$BUNDLE_DIR"
             bash "$BUNDLE_DIR/deploy/ops/deploy-server.sh" "$BUNDLE_DIR/deploy"
+            if [ "$(id -u)" -eq 0 ]; then
+              APP_PORT="$APP_PORT" bash "$APP_DIR/current/ops/configure-nginx.sh"
+            else
+              printf '%s\n' "$MYAKA_SUDO_PASSWORD" | sudo -S -p '' -- env APP_PORT="$APP_PORT" bash "$APP_DIR/current/ops/configure-nginx.sh"
+            fi
             rm -rf "$BUNDLE_DIR"
+
+      - name: Check public HTTPS site
+        if: steps.server.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/" -o /tmp/myaka-home.html
+          test -s /tmp/myaka-home.html
+          grep -q '<title>Мяка' /tmp/myaka-home.html
+          curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/robots.txt"
+          curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/sitemap.xml"
+          echo "Site is available over HTTPS: $NEXT_PUBLIC_SITE_URL" >> "$GITHUB_STEP_SUMMARY"
