@@ -29,6 +29,8 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mood, setMood] = useState<MyakaExpression>("slow");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pettingActive = useRef(false);
+  const lastStroke = useRef(0);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,9 +44,21 @@ export default function Home() {
   }, []);
 
   function strokeCat() {
-    if (timer.current) clearTimeout(timer.current);
+    lastStroke.current = Date.now();
+    if (pettingActive.current) return;
+    pettingActive.current = true;
     setPetting(true);
-    timer.current = setTimeout(() => setPetting(false), 2600);
+    const settle = () => {
+      const remaining = 2600 - (Date.now() - lastStroke.current);
+      if (remaining > 0) {
+        timer.current = setTimeout(settle, remaining);
+        return;
+      }
+      pettingActive.current = false;
+      timer.current = null;
+      setPetting(false);
+    };
+    timer.current = setTimeout(settle, 2600);
   }
 
   function petCat() {
@@ -62,7 +76,7 @@ export default function Home() {
           <nav className={`navigation ${menuOpen ? "open" : ""}`} aria-label="Основная навигация" id="main-navigation">
             <a href="#about" onClick={() => setMenuOpen(false)}>Это Мяка</a>
             <a href="#mood" onClick={() => setMenuOpen(false)}>Настроение</a>
-            <a href="#little-things" onClick={() => setMenuOpen(false)}>Фотографии</a>
+            <a href="#little-things" onClick={() => setMenuOpen(false)}>На вещах</a>
             <a href={telegramUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>Telegram</a>
           </nav>
           <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="main-navigation" aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}>{menuOpen ? <X /> : <Menu />}</button>
@@ -71,14 +85,14 @@ export default function Home() {
         <div className="hero-main">
           <div className="hero-copy">
             <h1>Привет.<br />Я <span className="name-underline">Мяка.</span></h1>
-            <p className="hero-description">Кот из маленьких историй про обычную жизнь.<br />Спит где удобно. Проверяет каждую коробку.</p>
+            <p className="hero-description">Кот, который просто есть.<br />Спит где удобно. Проверяет каждую коробку.<br />Иногда грустит. И всё равно остаётся собой.</p>
             <a className="paper-button" href="#about">Познакомиться</a>
           </div>
           <div className={`cat-stage ${petting ? "is-petting" : ""}`}>
             <div className="cat-paper" aria-hidden="true" />
             <button className="cat-touch" onClick={petCat} onPointerDown={() => strokeCat()}
               onPointerMove={(event) => { if (event.buttons === 1) strokeCat(); }} aria-label="Погладить Мяку">
-              <MyakaFace expression={petting ? "happy" : mood} className="hero-cat" />
+              <span className="pet-motion"><MyakaFace expression={petting ? "happy" : mood} className="hero-cat" /></span>
             </button>
             <span className={`purr ${petting ? "show" : ""}`} aria-live="polite">{petting ? "мррр…" : ""}</span>
             <button className="pet-label" onClick={petCat}>Погладить</button>
@@ -101,6 +115,7 @@ export default function Home() {
             <div className="about-copy">
               <p>Мяка — рисованный кот и герой маленьких историй о повседневной жизни. Сон, любопытство, упрямство — в его кошачьих делах легко узнать себя.</p>
               <p>Всё началось с рисунков ручкой в тетради. Из этих зарисовок и вырос Мяка со своим характером.</p>
+              <p>Его обычная мордочка — немного грустная и задумчивая. Так задумано: Мяка не улыбается всё время. Он может молча сидеть рядом, смотреть в окно и быть в своём настроении. А если погладить — улыбнётся.</p>
             </div>
           </div>
         </div>
@@ -108,6 +123,7 @@ export default function Home() {
 
       <section className="day-section section-pad" id="day" aria-labelledby="day-title">
         <h2 className="reveal" id="day-title">Один день Мяки</h2>
+        <p className="section-note reveal">У него маленькие дела: найти место потеплее, проверить подозрительный шорох, побыть рядом. Из этого и складываются его истории.</p>
         <div className="story-grid">
           {stories.map((story) => <article className={`story story-${story.scene} reveal`} key={story.scene}>
             <MyakaScene scene={story.scene} />
@@ -117,7 +133,7 @@ export default function Home() {
       </section>
 
       <section className="mood-section section-pad" id="mood" aria-labelledby="mood-title" style={{ backgroundColor: currentMood.color }}>
-        <div className="mood-heading reveal"><h2 id="mood-title">Мяка сегодня</h2></div>
+        <div className="mood-heading reveal"><h2 id="mood-title">Мяка сегодня</h2><p className="section-note">Иногда тихий, иногда любопытный, иногда себе на уме. Настроение меняется — Мяка остаётся Мякой.</p></div>
         <Tabs value={mood} onValueChange={(value) => setMood(value as MyakaExpression)} className="mood-tabs reveal">
           <TabsList className="mood-list" variant="line" aria-label="Выбрать настроение">
             {moods.map((item) => <TabsTrigger className="mood-trigger" key={item.id} value={item.id}>{item.label}</TabsTrigger>)}
@@ -127,7 +143,7 @@ export default function Home() {
             <div className={`mood-stamp mood-${item.id} ${petting ? "is-petting" : ""}`}>
               <button className="mood-pet" onClick={petCat} onPointerDown={() => strokeCat()}
                 onPointerMove={(event) => { if (event.buttons === 1) strokeCat(); }} aria-label="Погладить Мяку в настроении">
-                <MyakaFace expression={petting ? "happy" : item.id as MyakaExpression} />
+                <span className="pet-motion"><MyakaFace expression={petting ? "happy" : item.id as MyakaExpression} /></span>
               </button>
               <span aria-live="polite">{petting ? "мррр…" : ""}</span>
             </div>
@@ -136,21 +152,24 @@ export default function Home() {
       </section>
 
       <section className="little-things section-pad" id="little-things" aria-labelledby="things-title">
-        <div className="things-heading reveal"><h2 id="things-title">Мяка на вещах</h2></div>
+        <div className="things-heading reveal"><h2 id="things-title">Мяка на вещах</h2><p className="section-note">Из тетради — в обычный день. Его неровные линии хорошо живут на бумаге и на вещах, которые всегда под рукой.</p></div>
         <div className="photo-layout">
           <div className="photo-slot photo-one reveal">
           <figure className="paper-photo">
             <span className="tape" aria-hidden="true" />
             <div className="photo-window"><img src="/images/paper.webp" alt="Эскиз айдентики Мяки: кот на обложке блокнота среди бумаги и карандашей" width="1536" height="1024" loading="lazy" /></div>
+            <figcaption className="object-caption"><h3>Для мыслей на полях</h3><p>Блокнот для набросков, планов и внезапных мыслей. Мяка на обложке просто составляет компанию — даже когда на странице пока пусто.</p></figcaption>
           </figure>
           </div>
           <div className="photo-slot photo-two reveal">
           <figure className="paper-photo">
             <span className="tape" aria-hidden="true" />
             <div className="photo-window"><img src="/images/cup.webp" alt="Эскиз айдентики Мяки: керамическая кружка с котом в тёплом солнечном свете" width="1536" height="1024" loading="lazy" /></div>
+            <figcaption className="object-caption"><h3>Для паузы с чаем</h3><p>Тёплая кружка, знакомый кот и несколько минут для себя. Можно смотреть в окно и никуда не спешить.</p></figcaption>
           </figure>
           </div>
         </div>
+        <p className="objects-note reveal">Пока это примеры того, как Мяка может выглядеть на вещах. Есть идея для него? Расскажи в <a href={telegramUrl} target="_blank" rel="noopener noreferrer">Telegram</a>.</p>
       </section>
       </main>
 

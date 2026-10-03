@@ -1,10 +1,11 @@
 "use client";
 
 import faceData from "@/lib/myaka-face.json";
+import { memo } from "react";
 
 export type MyakaExpression = keyof typeof faceData.expressions;
 
-export function MyakaFace({ expression = "slow", className = "" }: { expression?: MyakaExpression; className?: string }) {
+export const MyakaFace = memo(function MyakaFace({ expression = "slow", className = "" }: { expression?: MyakaExpression; className?: string }) {
   return (
     <svg
       className={`myaka-face ${className}`}
@@ -27,4 +28,4 @@ export function MyakaFace({ expression = "slow", className = "" }: { expression?
       ))}
     </svg>
   );
-}
+});
