@@ -1,0 +1,39 @@
+# Dependencies and build output
+node_modules/
+dist/
+.next/
+.vinext/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+.ssh/
+
+# Deployment archives, releases and logs
+deploy/
+deploy.zip
+*.zip
+releases/
+shared/
+logs/
+*.log
+.pm2/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temporary output
+outputs/
+work/

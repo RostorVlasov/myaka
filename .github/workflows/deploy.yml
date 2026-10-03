@@ -1,0 +1,111 @@
+name: Deploy Myaka to Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: myaka-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '/var/www/myaka' }}
+      APP_PORT: ${{ vars.APP_PORT || '2027' }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL || 'https://myaka.rumiscola.ru' }}
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check TypeScript
+        run: bun run typecheck
+
+      - name: Build frontend
+        run: bun run build
+
+      - name: Prepare deploy.zip
+        run: bun run package:deploy
+
+      - name: Save deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myaka-deploy-${{ github.run_id }}
+          path: deploy.zip
+          retention-days: 14
+
+      - name: Check server configuration
+        id: server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$APP_DIR" =~ ^/[a-zA-Z0-9/_-]+$ && "$APP_DIR" != / ]]
+          [[ "$APP_PORT" =~ ^[0-9]{1,5}$ ]] && ((10#$APP_PORT >= 1 && 10#$APP_PORT <= 65535))
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] && ((10#$SSH_PORT >= 1 && 10#$SSH_PORT <= 65535))
+          if [[ -n "$SSH_HOST" && -n "$SSH_USER" && -n "$SSH_KEY" ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Build completed. Configure SSH_HOST, SSH_USER and SSH_KEY to enable server deployment.'
+            echo '### Server deployment is not configured' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The build and deploy.zip are ready. Add SSH_HOST, SSH_USER, SSH_KEY and, if needed, SSH_PORT in repository Actions secrets, then run this workflow again.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload deploy.zip to server
+        if: steps.server.outputs.ready == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          source: deploy.zip
+          target: ${{ env.APP_DIR }}/incoming/${{ env.RELEASE_ID }}/
+
+      - name: Deploy on server with PM2
+        if: steps.server.outputs.ready == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          command_timeout: 5m
+          envs: APP_DIR,APP_PORT,RELEASE_ID
+          script: |
+            set -eu
+            export PATH="$HOME/.bun/bin:$PATH"
+            BUNDLE_DIR="$APP_DIR/incoming/$RELEASE_ID"
+            unzip -q -o "$BUNDLE_DIR/deploy.zip" -d "$BUNDLE_DIR"
+            bash "$BUNDLE_DIR/deploy/ops/deploy-server.sh" "$BUNDLE_DIR/deploy"
+            rm -rf "$BUNDLE_DIR"
