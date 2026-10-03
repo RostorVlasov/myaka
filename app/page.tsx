@@ -165,7 +165,7 @@ export default function Home() {
           <figure className="paper-photo">
             <span className="tape" aria-hidden="true" />
             <div className="photo-window"><img src="/images/cup.webp" alt="Эскиз айдентики Мяки: керамическая кружка с котом в тёплом солнечном свете" width="1536" height="1024" loading="lazy" /></div>
-            <figcaption className="object-caption"><h3>Для паузы с чаем</h3><p>Тёплая кружка, знакомый кот и несколько минут для себя. Можно смотреть в окно и никуда не спешить.</p></figcaption>
+            <figcaption className="object-caption"><h3>Для тёплой паузы</h3><p>Тёплая кружка, знакомый кот и несколько минут для себя. Можно смотреть в окно и никуда не спешить.</p></figcaption>
           </figure>
           </div>
         </div>
