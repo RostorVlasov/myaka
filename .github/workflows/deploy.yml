@@ -124,6 +124,10 @@ jobs:
           curl --fail --silent --show-error --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/" -o /tmp/myaka-home.html
           test -s /tmp/myaka-home.html
           grep -q '<title>Мяка' /tmp/myaka-home.html
+          grep -q 'property="og:image"' /tmp/myaka-home.html
+          grep -q 'myaka-preview.jpg' /tmp/myaka-home.html
+          curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/images/myaka-preview.jpg" -o /tmp/myaka-preview.jpg
+          test -s /tmp/myaka-preview.jpg
           curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/robots.txt"
           curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/sitemap.xml"
           echo "Site is available over HTTPS: $NEXT_PUBLIC_SITE_URL" >> "$GITHUB_STEP_SUMMARY"
