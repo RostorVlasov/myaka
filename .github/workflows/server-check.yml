@@ -1,0 +1,53 @@
+name: Check server access
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/server-check.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check server and authorize deployment key
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          timeout: 30s
+          command_timeout: 2m
+          script: |
+            set -eu
+            uname -s
+            id
+            cat /etc/os-release 2>/dev/null || true
+            for tool in bun pm2 node nginx sudo unzip curl certbot; do
+              printf '%s: ' "$tool"
+              command -v "$tool" || true
+            done
+            if sudo -n true 2>/dev/null; then
+              printf 'sudo_without_password=yes\n'
+            else
+              printf 'sudo_without_password=no\n'
+            fi
+            printf 'domain_ipv4:\n'
+            getent ahostsv4 myaka.rumiscola.ru 2>/dev/null || true
+            printf 'server_addresses:\n'
+            hostname -I 2>/dev/null || true
+            umask 077
+            mkdir -p "$HOME/.ssh"
+            touch "$HOME/.ssh/authorized_keys"
+            DEPLOY_PUBLIC_KEY='restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHeC0P/Tw0BQGupag/wfwUGlUwoidakZaZITvQqw0cVG myaka-deploy'
+            if ! grep -Fqx "$DEPLOY_PUBLIC_KEY" "$HOME/.ssh/authorized_keys"; then
+              printf '%s\n' "$DEPLOY_PUBLIC_KEY" >> "$HOME/.ssh/authorized_keys"
+            fi
+            chmod 700 "$HOME/.ssh"
+            chmod 600 "$HOME/.ssh/authorized_keys"
+            printf 'myaka_deploy_key=authorized\n'
