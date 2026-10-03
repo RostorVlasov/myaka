@@ -24,11 +24,19 @@ export const metadata: Metadata = {
     siteName,
     title: siteTitle,
     description: siteDescription,
+    images: [{
+      url: "/images/myaka-preview.jpg",
+      width: 1200,
+      height: 630,
+      type: "image/jpeg",
+      alt: "Мяка — просто быть собой",
+    }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: siteTitle,
     description: siteDescription,
+    images: ["/images/myaka-preview.jpg"],
   },
   icons: {
     icon: "/favicon.svg",
