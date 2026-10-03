@@ -14,7 +14,7 @@ rm -f deploy.zip
 mkdir -p deploy/dist deploy/ops
 cp -a dist/client deploy/dist/
 cp server.ts ecosystem.config.cjs .env.example deploy/
-cp ops/deploy-server.sh deploy/ops/
+cp ops/deploy-server.sh ops/configure-nginx.sh deploy/ops/
 
 cat > deploy/package.json <<'JSON'
 {
