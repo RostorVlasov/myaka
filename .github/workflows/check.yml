@@ -1,6 +1,8 @@
 name: Check Myaka changes
 
 on:
+  push:
+    branches: [feature/myaka-ai-chat]
   pull_request:
 
 permissions:
