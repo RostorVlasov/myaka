@@ -48,7 +48,26 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
   }
 
   let body: unknown;
-  try { body = await request.json(); } catch { return chatError(400, "Неверный JSON"); }
+  try {
+    const reader = request.body?.getReader();
+    if (!reader) return chatError(400, "Пустое сообщение");
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 8192) {
+        await reader.cancel();
+        return chatError(413, "Сообщение слишком длинное");
+      }
+      chunks.push(value);
+    }
+    const raw = new Uint8Array(bytes);
+    let offset = 0;
+    for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
+    body = JSON.parse(new TextDecoder().decode(raw));
+  } catch { return chatError(400, "Неверный JSON"); }
   if (!body || typeof body !== "object" || !("messages" in body) || !Array.isArray(body.messages) ||
       body.messages.length < 1 || body.messages.length > 9 ||
       !body.messages.every((item: unknown) => item && typeof item === "object" &&
