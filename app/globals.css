@@ -156,3 +156,24 @@ h1,h2,h3 {font-weight:700;}
 }
 @media (max-width:360px) {.hero-copy h1 {font-size:5.3rem;}.cat-stage {min-height:14rem;}.mood-trigger[data-slot="tabs-trigger"] {font-size:1.1rem;padding:.4rem .7rem;}.mood-words h3 {font-size:3.5rem;}.things-heading h2 {font-size:3.1rem;}}
 @media (prefers-reduced-motion:reduce) {html {scroll-behavior:auto;}*,*::before,*::after {animation:none!important;transition:none!important;}.reveal {opacity:1!important;translate:none!important;}}
+
+.myaka-chat {background:#eee2cf;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:7%;align-items:center;}
+.myaka-chat-intro h2 {font-size:clamp(3.2rem,5.1vw,5.5rem);line-height:1.05;}
+.myaka-chat-intro p {font-size:1.5rem;max-width:22rem;margin-top:1.1rem;}
+.myaka-chat-face {width:min(17rem,70%);margin:2rem auto 0;transform:rotate(-5deg);}
+.myaka-chat-card {background:#faf5e9;border:1px solid #24221f75;box-shadow:7px 8px 0 #b8b79f;min-width:0;padding:1.2rem;transform:rotate(.4deg);}
+.myaka-chat-log {height:20rem;overflow-y:auto;display:flex;flex-direction:column;gap:.8rem;padding:.5rem .2rem 1.2rem;scrollbar-color:#b9aa96 transparent;}
+.myaka-chat-empty {font-size:1.8rem;margin:auto;text-align:center;transform:rotate(-3deg);}
+.myaka-chat-bubble {max-width:85%;padding:.65rem .9rem;white-space:pre-wrap;overflow-wrap:anywhere;font-size:1.35rem;line-height:1.25;border:1px solid #24221f45;}
+.myaka-chat-bubble span {display:block;font-size:1rem;opacity:.65;margin-bottom:.2rem;}
+.myaka-chat-bubble.from-user {align-self:flex-end;background:#d9d5bf;transform:rotate(1deg);}
+.myaka-chat-bubble.from-myaka {align-self:flex-start;background:#f2e6d2;transform:rotate(-1deg);}
+.myaka-chat-status {font-size:1.2rem;opacity:.7;}
+.myaka-chat-form {display:flex;gap:.6rem;border-top:1px solid #24221f40;padding-top:1rem;}
+.myaka-chat-form input {font:inherit;font-size:1.25rem;min-width:0;flex:1;background:transparent;border:1px solid #24221f65;border-radius:2px;padding:.5rem .7rem;color:var(--ink);}
+.myaka-chat-form input:focus-visible {outline:2px solid var(--ink);outline-offset:2px;}
+.myaka-chat-form button {background:var(--ink);color:var(--paper);padding:.5rem 1rem;border-radius:2px;font-size:1.2rem;}
+.myaka-chat-form button:disabled {opacity:.5;cursor:default;}
+.myaka-chat-error {color:#973f31;font-size:1.1rem;margin-top:.6rem;}
+.myaka-chat-disclosure {font-size:1rem;line-height:1.3;opacity:.7;margin-top:.75rem;}
+@media (max-width:760px) {.myaka-chat {grid-template-columns:1fr;gap:1.4rem;}.myaka-chat-intro {display:flex;align-items:center;gap:1rem;}.myaka-chat-intro h2 {font-size:3.2rem;}.myaka-chat-intro p {font-size:1.25rem;}.myaka-chat-face {width:6rem;margin:0;flex:none;}.myaka-chat-log {height:18rem;}.myaka-chat-card {transform:none;}}

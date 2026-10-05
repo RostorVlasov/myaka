@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MyakaFace, type MyakaExpression } from "@/components/myaka-face";
 import { MyakaScene } from "@/components/myaka-scene";
+import { MyakaChat } from "@/components/myaka-chat";
 
 const moods = [
   { id: "slow", label: "Спокойный", line: "Никуда не спешу.", note: "Нашёл тёплое место. Остальное подождёт.", color: "#b8b79f" },
@@ -77,6 +78,7 @@ export default function Home() {
             <a href="#about" onClick={() => setMenuOpen(false)}>Это Мяка</a>
             <a href="#mood" onClick={() => setMenuOpen(false)}>Настроение</a>
             <a href="#little-things" onClick={() => setMenuOpen(false)}>На вещах</a>
+            <a href="#chat" onClick={() => setMenuOpen(false)}>Поговорить</a>
             <a href={telegramUrl} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>Telegram</a>
           </nav>
           <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="main-navigation" aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}>{menuOpen ? <X /> : <Menu />}</button>
@@ -120,6 +122,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <MyakaChat />
 
       <section className="day-section section-pad" id="day" aria-labelledby="day-title">
         <h2 className="reveal" id="day-title">Один день Мяки</h2>
