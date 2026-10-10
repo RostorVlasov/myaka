@@ -10,6 +10,7 @@
     "build": "vinext build && node ops/write-static-metadata.mjs",
     "start": "bun server.ts",
     "typecheck": "tsc --noEmit",
+    "test:chat": "bun test tests/chat.test.ts",
     "lint": "eslint app components lib server.ts vite.config.ts next.config.ts",
     "package:deploy": "bash ops/package-deploy.sh"
   },

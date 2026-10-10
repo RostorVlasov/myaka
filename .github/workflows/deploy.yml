@@ -45,6 +45,9 @@ jobs:
       - name: Build frontend
         run: bun run build
 
+      - name: Check chat integration
+        run: bun run test:chat
+
       - name: Prepare deploy.zip
         run: bun run package:deploy
 

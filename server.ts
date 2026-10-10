@@ -20,6 +20,27 @@ const chatHeaders = {
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 };
+const MAX_CHAT_BODY_BYTES = 48_000;
+const CHAT_TIMEOUT_MS = 60_000;
+const MYAKA_PROMPT = "Ты Мяка, выдуманный чёрный кот с характером. Ты спокойный, ленивый, чуть наглый и невозмутимый. Отвечай по-русски коротко и естественно, обычно 1-3 предложения. Не улыбайся постоянно, не сюсюкай, не изображай психолога. Ты любишь тёплые места, коробки и смотреть в окно. Если спрашивают, кто отвечает, честно скажи, что ты персонаж, которому помогает нейросеть. Не придумывай факты о посетителе или создателях. Если человек пишет о немедленной опасности для себя, отложи шутки, предложи позвать находящегося рядом человека и обратиться в местную экстренную службу.";
+
+function aiConnection() {
+  const agentBaseUrl = process.env.AI_AGENT_BASE_URL?.trim().replace(/\/+$/, "");
+  if (agentBaseUrl) {
+    const key = process.env.AI_AGENT_API_KEY?.trim();
+    if (!key) return null;
+    const url = new URL(agentBaseUrl);
+    if (url.protocol !== "https:" || url.hostname !== "agent.timeweb.cloud" ||
+        url.username || url.password || url.port || url.search || url.hash ||
+        !/^\/api\/v1\/cloud-ai\/agents\/[a-zA-Z0-9-]+\/v1$/.test(url.pathname)) {
+      throw new Error("Invalid AI_AGENT_BASE_URL");
+    }
+    return { key, endpoint: `${agentBaseUrl}/chat/completions`, agent: true };
+  }
+  const key = process.env.AI_GATEWAY_API_KEY?.trim();
+  return key ? { key, endpoint: "https://api.timeweb.ai/v1/chat/completions", agent: false } : null;
+}
+
 const chatError = (status: number, message: string) =>
   new Response(JSON.stringify({ error: message }), { status, headers: chatHeaders });
 
@@ -30,10 +51,15 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
   if (request.headers.get("origin") !== expectedOrigin) return chatError(403, "Недоступно");
   if (!request.headers.get("content-type")?.startsWith("application/json")) return chatError(415, "Ожидается JSON");
 
-  const key = process.env.AI_GATEWAY_API_KEY;
-  if (!key) return chatError(503, "Чат пока не настроен");
+  let connection: ReturnType<typeof aiConnection>;
+  try { connection = aiConnection(); }
+  catch {
+    console.error("Invalid AI chat configuration");
+    return chatError(503, "Чат пока не настроен");
+  }
+  if (!connection) return chatError(503, "Чат пока не настроен");
   const length = Number(request.headers.get("content-length") || 0);
-  if (length > 8192) return chatError(413, "Сообщение слишком длинное");
+  if (length > MAX_CHAT_BODY_BYTES) return chatError(413, "Сообщение слишком длинное");
 
   const ip = request.headers.get("x-real-ip") || server.requestIP(request)?.address || "unknown";
   const now = Date.now();
@@ -57,7 +83,7 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
       const { value, done } = await reader.read();
       if (done) break;
       bytes += value.byteLength;
-      if (bytes > 8192) {
+      if (bytes > MAX_CHAT_BODY_BYTES) {
         await reader.cancel();
         return chatError(413, "Сообщение слишком длинное");
       }
@@ -73,7 +99,7 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
       !body.messages.every((item: unknown) => item && typeof item === "object" &&
         "role" in item && (item.role === "user" || item.role === "assistant") &&
         "content" in item && typeof item.content === "string" &&
-        item.content.trim().length > 0 && item.content.length <= 800) ||
+        item.content.trim().length > 0 && item.content.length <= (item.role === "assistant" ? 1200 : 800)) ||
       body.messages.at(-1).role !== "user") {
     return chatError(400, "Проверь сообщение");
   }
@@ -83,22 +109,25 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
   chatLimits.set(ip, limit);
   activeChats++;
   try {
-    const response = await fetch("https://api.timeweb.ai/v1/chat/completions", {
+    const response = await fetch(connection.endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${connection.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "dashscope/qwen3.5-plus",
         messages: [
-          { role: "system", content: "Ты Мяка, выдуманный чёрный кот с характером. Ты спокойный, ленивый, чуть наглый и невозмутимый. Отвечай по-русски коротко и естественно, обычно 1-3 предложения. Не улыбайся постоянно, не сюсюкай, не изображай психолога. Ты любишь тёплые места, коробки и смотреть в окно. Если спрашивают, кто отвечает, честно скажи, что ты персонаж, которому помогает нейросеть. Не придумывай факты о посетителе или создателях. Если человек пишет о немедленной опасности для себя, отложи шутки, предложи позвать находящегося рядом человека и обратиться в местную экстренную службу." },
+          { role: "system", content: MYAKA_PROMPT },
           ...body.messages,
         ],
-        max_tokens: 180,
-        temperature: 0.8,
+        stream: false,
+        // Agent models and generation options are configured in Timeweb.
+        // In particular, GPT-5 rejects temperature and max_tokens.
+        ...(connection.agent ? {} : { model: "dashscope/qwen3.5-plus", max_tokens: 512, temperature: 0.8 }),
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(CHAT_TIMEOUT_MS)]),
     });
     if (!response.ok) {
-      console.error("AI Gateway returned", response.status);
+      console.error("AI chat returned", response.status);
+      if (response.status === 401 || response.status === 403) return chatError(503, "Чат пока не настроен");
+      if (response.status === 429) return chatError(429, "Мяка немного устал. Попробуй позже");
       return chatError(502, "Мяка не смог ответить. Попробуй позже");
     }
     const result: unknown = await response.json();
@@ -107,7 +136,10 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
     if (typeof reply !== "string" || !reply.trim()) return chatError(502, "Мяка задумался. Попробуй позже");
     return new Response(JSON.stringify({ reply: reply.trim().slice(0, 1200) }), { headers: chatHeaders });
   } catch (error) {
-    console.error("AI Gateway request failed:", error instanceof Error ? error.name : "unknown");
+    console.error("AI chat request failed:", error instanceof Error ? error.name : "unknown");
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return chatError(504, "Мяка долго думает. Попробуй ещё раз");
+    }
     return chatError(502, "Мяка не смог ответить. Попробуй позже");
   } finally {
     activeChats--;
@@ -117,6 +149,8 @@ async function chat(request: Request, server: import("bun").Server<undefined>) {
 const server = Bun.serve({
   hostname: process.env.HOST || "127.0.0.1",
   port,
+  // AI responses can take longer than Bun's default ten-second idle timeout.
+  idleTimeout: 75,
   async fetch(request, server) {
     if (new URL(request.url).pathname === "/api/chat") {
       if (request.method !== "POST") return chatError(405, "Метод не поддерживается");

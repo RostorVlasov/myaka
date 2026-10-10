@@ -101,7 +101,7 @@ EOF
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_connect_timeout 5s;
-        proxy_read_timeout 30s;
+        proxy_read_timeout 75s;
     }
 }
 EOF
