@@ -96,6 +96,28 @@ jobs:
       - name: Deploy on server with PM2
         if: steps.server.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          command_timeout: 10m
+          envs: APP_DIR,APP_PORT,RELEASE_ID
+          script: |
+            set -eu
+            export PATH="$HOME/.local/share/myaka/bun/bin:$HOME/.bun/bin:$PATH"
+            BUNDLE_DIR="$APP_DIR/incoming/$RELEASE_ID"
+            unzip -q -o "$BUNDLE_DIR/deploy.zip" -d "$BUNDLE_DIR"
+            bash "$BUNDLE_DIR/deploy/ops/deploy-server.sh" "$BUNDLE_DIR/deploy"
+            rm -rf "$BUNDLE_DIR"
+
+      - name: Update Nginx configuration
+        id: nginx
+        if: steps.server.outputs.ready == 'true'
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.0.3
         env:
           MYAKA_SUDO_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         with:
@@ -105,20 +127,22 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
-          command_timeout: 10m
-          envs: APP_DIR,APP_PORT,RELEASE_ID,MYAKA_SUDO_PASSWORD
+          command_timeout: 5m
+          envs: APP_DIR,APP_PORT,MYAKA_SUDO_PASSWORD
           script: |
             set -eu
-            export PATH="$HOME/.local/share/myaka/bun/bin:$HOME/.bun/bin:$PATH"
-            BUNDLE_DIR="$APP_DIR/incoming/$RELEASE_ID"
-            unzip -q -o "$BUNDLE_DIR/deploy.zip" -d "$BUNDLE_DIR"
-            bash "$BUNDLE_DIR/deploy/ops/deploy-server.sh" "$BUNDLE_DIR/deploy"
             if [ "$(id -u)" -eq 0 ]; then
               APP_PORT="$APP_PORT" bash "$APP_DIR/current/ops/configure-nginx.sh"
             else
               printf '%s\n' "$MYAKA_SUDO_PASSWORD" | sudo -S -p '' -- env APP_PORT="$APP_PORT" bash "$APP_DIR/current/ops/configure-nginx.sh"
             fi
-            rm -rf "$BUNDLE_DIR"
+
+      - name: Report Nginx configuration warning
+        if: steps.server.outputs.ready == 'true' && steps.nginx.outcome == 'failure'
+        run: |
+          echo '::warning::Application release is running, but Nginx configuration could not be updated. Check SSH_PASSWORD for sudo, or run configure-nginx.sh on the server.'
+          echo '### Nginx configuration needs attention' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The application release started. Nginx was not updated; its existing timeouts remain in effect. Fix SSH_PASSWORD or run sudo bash current/ops/configure-nginx.sh from the application directory. Public checks below must still confirm the exact new HTML.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check public HTTPS site
         if: steps.server.outputs.ready == 'true'
@@ -129,6 +153,7 @@ jobs:
           grep -q '<title>Мяка' /tmp/myaka-home.html
           grep -q 'property="og:image"' /tmp/myaka-home.html
           grep -q 'myaka-preview.jpg' /tmp/myaka-home.html
+          cmp --silent dist/client/index.html /tmp/myaka-home.html
           curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/images/myaka-preview.jpg" -o /tmp/myaka-preview.jpg
           test -s /tmp/myaka-preview.jpg
           curl --fail --silent --show-error --connect-timeout 15 --max-time 30 "$NEXT_PUBLIC_SITE_URL/robots.txt"
