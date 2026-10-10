@@ -48,7 +48,7 @@ bun run start
 bash /var/www/myaka/current/ops/configure-chat.sh
 ```
 
-Скрипт спросит Base URL со вкладки «Дашборд» агента, затем API-токен (ввод скрыт). Он сохранит `AI_AGENT_BASE_URL` и `AI_AGENT_API_KEY` в `/var/www/myaka/shared/.env` с правами 600, оставит остальные настройки и перезапустит Мяку. Base URL имеет вид `https://agent.timeweb.cloud/api/v1/cloud-ai/agents/ACCESS_ID/v1`. Можно передать его первым аргументом скрипта. Если папка приложения другая, укажи её в пути к скрипту и передай `MYAKA_ENV_FILE=/путь/shared/.env`.
+Скрипт спросит Base URL со вкладки «Дашборд» агента, затем API-токен (ввод скрыт). Сначала он проверит ответ агента через API (до 60 секунд). После успешной проверки он сохранит `AI_AGENT_BASE_URL` и `AI_AGENT_API_KEY` в `/var/www/myaka/shared/.env` с правами 600, оставит остальные настройки и перезапустит Мяку. При ошибке он покажет причину без токена и сохранит прежние настройки. Base URL имеет вид `https://agent.timeweb.cloud/api/v1/cloud-ai/agents/ACCESS_ID/v1`. Можно передать его первым аргументом скрипта. Если папка приложения другая, укажи её в пути к скрипту и передай `MYAKA_ENV_FILE=/путь/shared/.env`.
 
 **Access ID из URL не является API-токеном.** Создай токен в панели Timeweb: «ИИ-сервисы» → «Агенты» → нужный агент → «Управление» → «Доступ по API» → «Добавить новый ключ». Ключ AI Gateway относится к другому API. Не используй префикс `NEXT_PUBLIC_` и не клади ключ в GitHub Actions Variables. Документация: [OpenAI-совместимый API](https://timeweb.cloud/docs/ai-agents/api-usage/openai-compatible-api), [ключи доступа](https://timeweb.cloud/docs/ai-agents/manage-agents/api-access-key).
 
